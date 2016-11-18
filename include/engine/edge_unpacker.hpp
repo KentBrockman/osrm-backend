@@ -58,6 +58,14 @@ inline void UnpackCHPath(const DataFacadeT &facade,
         recursion_stack.emplace(*std::prev(current), *current);
     }
 
+    std::cout << "Available Edges:\n";
+    for (auto edge = facade.BeginEdges(*packed_path_begin);
+         edge != facade.EndEdges(*packed_path_begin);
+         ++edge)
+    {
+        std::cout << "\t" << facade.GetTarget(edge) << std::endl;
+    }
+
     std::pair<NodeID, NodeID> edge;
     while (!recursion_stack.empty())
     {

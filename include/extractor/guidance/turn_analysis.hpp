@@ -23,9 +23,13 @@
 
 #include <memory>
 #include <string>
+#include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 namespace osrm
 {
@@ -47,14 +51,38 @@ class TurnAnalysis
                  const SuffixTable &street_name_suffix_table,
                  const ProfileProperties &profile_properties);
 
+    /* Full Analysis Process for a single node/edge combination. Use with caution, as the process is
+     * relatively expensive */
+    OSRM_ATTR_WARN_UNUSED
+    Intersection operator()(const NodeID node_prior_to_intersection,
+                            const EdgeID entering_via_edge) const;
+
     /*
      * Returns a normalized intersection without any assigned turn types.
      * This intersection can be used as input for intersection classification, turn lane assignment
      * and similar.
      */
     OSRM_ATTR_WARN_UNUSED
-    Intersection operator()(const NodeID from_node, const EdgeID via_eid) const;
+    std::tuple<Intersection, Intersection, std::unordered_map<EdgeID, EdgeID>>
+    ComputeIntersectionShapes(const NodeID node_at_center_of_intersection) const;
 
+    /*
+     * To be used in the road network, we need to check for valid/restricted turns. These two
+     * functions transform a basic intersection / a normalised intersection into the correct views
+     * when entering via a given edge.
+     */
+    OSRM_ATTR_WARN_UNUSED
+    Intersection AssignTurnAnglesAndValidTags(const NodeID previous_node,
+                                              const EdgeID entering_via_edge,
+                                              Intersection intersection) const;
+    // version for normalised intersection
+    OSRM_ATTR_WARN_UNUSED
+    Intersection
+    AssignTurnAnglesAndValidTags(const NodeID previous_node,
+                                 const EdgeID entering_via_edge,
+                                 Intersection normalised_intersection,
+                                 const Intersection &intersection,
+                                 const std::unordered_map<EdgeID, EdgeID> &merging_map) const;
     /*
      * Post-Processing a generated intersection is useful for any intersection that was simply
      * generated using an intersection generator. In the normal use case, you don't have to call
@@ -72,8 +100,12 @@ class TurnAnalysis
     assignTurnTypes(const NodeID from_node, const EdgeID via_eid, Intersection intersection) const;
 
     const IntersectionGenerator &GetIntersectionGenerator() const;
+
   private:
     const util::NodeBasedDynamicGraph &node_based_graph;
+    const RestrictionMap &restriction_map;
+    const std::unordered_set<NodeID> &barrier_nodes;
+
     const IntersectionGenerator intersection_generator;
     const IntersectionNormalizer intersection_normalizer;
     const RoundaboutHandler roundabout_handler;
@@ -84,6 +116,10 @@ class TurnAnalysis
     // Utility function, setting basic turn types. Prepares for normal turn handling.
     Intersection
     setTurnTypes(const NodeID from, const EdgeID via_edge, Intersection intersection) const;
+
+    // checks turn restrictions for only allowed turn (if one exists)
+    boost::optional<NodeID> GetOnlyAllowedTurnIfExistent(const NodeID coming_from_node,
+                                                         const NodeID node_at_intersection) const;
 }; // class TurnAnalysis
 
 } // namespace guidance

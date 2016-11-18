@@ -209,12 +209,18 @@ template <class DataFacadeT, class Derived> class BasicRoutingInterface
                     const PhantomNodes &phantom_node_pair,
                     std::vector<PathData> &unpacked_path) const
     {
+        std::cout << "Packed Path:";
+        for( auto itr = packed_path_begin; itr != packed_path_end; ++itr )
+            std::cout << " " << *itr;
+        std::cout << std::endl;
         BOOST_ASSERT(std::distance(packed_path_begin, packed_path_end) > 0);
 
         const bool start_traversed_in_reverse =
             (*packed_path_begin != phantom_node_pair.source_phantom.forward_segment_id.id);
         const bool target_traversed_in_reverse =
             (*std::prev(packed_path_end) != phantom_node_pair.target_phantom.forward_segment_id.id);
+
+        std::cout << "Traversed: " << start_traversed_in_reverse << " " << target_traversed_in_reverse << std::endl;
 
         BOOST_ASSERT(*packed_path_begin == phantom_node_pair.source_phantom.forward_segment_id.id ||
                      *packed_path_begin == phantom_node_pair.source_phantom.reverse_segment_id.id);
@@ -242,18 +248,21 @@ template <class DataFacadeT, class Derived> class BasicRoutingInterface
                         ? phantom_node_pair.source_phantom.backward_travel_mode
                         : facade.GetTravelModeForEdgeID(edge_data.id);
 
+                std::cout << "Edge Data: " << edge_data.id << std::endl;
                 const auto geometry_index = facade.GetGeometryIndexForEdgeID(edge_data.id);
                 std::vector<NodeID> id_vector;
                 std::vector<EdgeWeight> weight_vector;
                 std::vector<DatasourceID> datasource_vector;
                 if (geometry_index.forward)
                 {
+                    std::cout << "Forward Geometry" << std::endl;
                     id_vector = facade.GetUncompressedForwardGeometry(geometry_index.id);
                     weight_vector = facade.GetUncompressedForwardWeights(geometry_index.id);
                     datasource_vector = facade.GetUncompressedForwardDatasources(geometry_index.id);
                 }
                 else
                 {
+                    std::cout << "Reverse Geometry" << std::endl;
                     id_vector = facade.GetUncompressedReverseGeometry(geometry_index.id);
                     weight_vector = facade.GetUncompressedReverseWeights(geometry_index.id);
                     datasource_vector = facade.GetUncompressedReverseDatasources(geometry_index.id);
@@ -414,6 +423,9 @@ template <class DataFacadeT, class Derived> class BasicRoutingInterface
             }
             BOOST_ASSERT(!unpacked_path.empty());
         }
+        std::cout << "[path]\n";
+        for( auto data : unpacked_path )
+            std::cout << "Turn Via Node " << data.turn_via_node << std::endl;
     }
 
     /**

@@ -39,6 +39,12 @@ inline LegGeometry assembleGeometry(const datafacade::BaseDataFacade &facade,
                                     const bool reversed_source,
                                     const bool reversed_target)
 {
+    std::cout << "Traversed: " << reversed_source << " " << reversed_target << std::endl;
+    std::cout << "Source: " << source_node.location << " Input: " << source_node.input_location << "\n";
+    std::cout << "Target: " << target_node.location << " Input: " << target_node.input_location << std::endl;
+    std::cout << "Leg\n";
+    for( auto data : leg_data )
+        std::cout << data.turn_via_node << " " << facade.GetCoordinateOfNode(data.turn_via_node) << std::endl;
     LegGeometry geometry;
 
     // segment 0 first and last
@@ -113,6 +119,9 @@ inline LegGeometry assembleGeometry(const datafacade::BaseDataFacade &facade,
     BOOST_ASSERT(geometry.locations.size() > geometry.segment_distances.size());
     BOOST_ASSERT(geometry.annotations.size() == geometry.locations.size() - 1);
 
+    std::cout << "Geometry\n";
+    for( auto c : geometry.locations )
+        std::cout << "\t" << c << std::endl;
     return geometry;
 }
 }

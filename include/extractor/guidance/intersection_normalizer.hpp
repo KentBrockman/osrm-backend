@@ -13,6 +13,8 @@
 #include "extractor/suffix_table.hpp"
 #include "util/name_table.hpp"
 
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace osrm
@@ -45,7 +47,8 @@ class IntersectionNormalizer
     // The function takes an intersection an converts it to a `perceived` intersection which closer
     // represents how a human might experience the intersection
     OSRM_ATTR_WARN_UNUSED
-    Intersection operator()(const NodeID node_at_intersection, Intersection intersection) const;
+    std::pair<Intersection, std::unordered_map<EdgeID, EdgeID>>
+    operator()(const NodeID node_at_intersection, Intersection intersection) const;
 
   private:
     const util::NodeBasedDynamicGraph &node_based_graph;
@@ -57,11 +60,17 @@ class IntersectionNormalizer
 
     // check if two indices in an intersection can be seen as a single road in the perceived
     // intersection representation. See below for an example. Utility function for
-    // MergeSegregatedRoads
+    // MergeSegregatedRoads. It also checks for neighboring merges
     bool CanMerge(const NodeID intersection_node,
                   const Intersection &intersection,
                   std::size_t first_index,
                   std::size_t second_index) const;
+
+    // A tool called by CanMerge
+    bool InnerCanMerge(const NodeID intersection_node,
+                       const Intersection &intersection,
+                       std::size_t first_index,
+                       std::size_t second_index) const;
 
     // Merge segregated roads to omit invalid turns in favor of treating segregated roads as
     // one.
@@ -75,8 +84,8 @@ class IntersectionNormalizer
     // The treatment results in a straight turn angle of 180º rather than a turn angle of approx
     // 160
     OSRM_ATTR_WARN_UNUSED
-    Intersection MergeSegregatedRoads(const NodeID intersection_node,
-                                      Intersection intersection) const;
+    std::pair<Intersection, std::unordered_map<EdgeID, EdgeID>>
+    MergeSegregatedRoads(const NodeID intersection_node, Intersection intersection) const;
 
     // The counterpiece to mergeSegregatedRoads. While we can adjust roads that split up at the
     // intersection itself, it can also happen that intersections are connected to joining roads.
@@ -90,8 +99,8 @@ class IntersectionNormalizer
     //
     // for the local view of b at a.
     OSRM_ATTR_WARN_UNUSED
-    Intersection AdjustForJoiningRoads(const NodeID node_at_intersection,
-                                       Intersection intersection) const;
+    Intersection AdjustBearingsForMergeAtDestination(const NodeID node_at_intersection,
+                                                     Intersection intersection) const;
 };
 
 } // namespace guidance

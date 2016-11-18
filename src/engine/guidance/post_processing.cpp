@@ -1,3 +1,5 @@
+#include "util/debug.hpp"
+
 #include "engine/guidance/post_processing.hpp"
 #include "extractor/guidance/constants.hpp"
 #include "extractor/guidance/turn_instruction.hpp"
@@ -91,37 +93,6 @@ bool compatible(const RouteStep &lhs, const RouteStep &rhs) { return lhs.mode ==
 
 // invalidate a step and set its content to nothing
 void invalidateStep(RouteStep &step) { step = getInvalidRouteStep(); }
-
-// Compute the angle between two bearings on a normal turn circle
-//
-//      Bearings                      Angles
-//
-//         0                           180
-//   315         45               225       135
-//
-// 270     x       90           270     x      90
-//
-//   225        135               315        45
-//        180                           0
-//
-// A turn from north to north-east offerst bearing 0 and 45 has to be translated
-// into a turn of 135 degrees. The same holdes for 90 - 135 (east to south
-// east).
-// For north, the transformation works by angle = 540 (360 + 180) - exit_bearing
-// % 360;
-// All other cases are handled by first rotating both bearings to an
-// entry_bearing of 0.
-double turn_angle(const double entry_bearing, const double exit_bearing)
-{
-    const double offset = 360 - entry_bearing;
-    const double rotated_exit = [](double bearing, const double offset) {
-        bearing += offset;
-        return bearing > 360 ? bearing - 360 : bearing;
-    }(exit_bearing, offset);
-
-    const auto angle = 540 - rotated_exit;
-    return angle > 360 ? angle - 360 : angle;
-}
 
 // Checks if name change happens the user wants to know about.
 // Treats e.g. "Name (Ref)" -> "Name" changes still as same name.
@@ -330,10 +301,10 @@ void closeOffRoundabout(const bool on_roundabout,
                              TurnType::EnterRoundaboutIntersectionAtExit)
                 {
                     BOOST_ASSERT(!propagation_step.intersections.empty());
-                    const double angle =
-                        turn_angle(util::bearing::reverseBearing(
-                                       entry_intersection.bearings[entry_intersection.in]),
-                                   exit_bearing);
+                    const double angle = util::bearing::angleBetweenBearings(
+                        util::bearing::reverseBearing(
+                            entry_intersection.bearings[entry_intersection.in]),
+                        exit_bearing);
 
                     auto bearings = propagation_step.intersections.front().bearings;
                     propagation_step.maneuver.instruction.direction_modifier =
@@ -396,10 +367,13 @@ double findTotalTurnAngle(const RouteStep &entry_step, const RouteStep &exit_ste
         util::bearing::reverseBearing(entry_intersection.bearings[entry_intersection.in]);
     const auto entry_step_exit_bearing = entry_intersection.bearings[entry_intersection.out];
 
-    const auto exit_angle = turn_angle(exit_step_entry_bearing, exit_step_exit_bearing);
-    const auto entry_angle = turn_angle(entry_step_entry_bearing, entry_step_exit_bearing);
+    const auto exit_angle =
+        util::bearing::angleBetweenBearings(exit_step_entry_bearing, exit_step_exit_bearing);
+    const auto entry_angle =
+        util::bearing::angleBetweenBearings(entry_step_entry_bearing, entry_step_exit_bearing);
 
-    const double total_angle = turn_angle(entry_step_entry_bearing, exit_step_exit_bearing);
+    const double total_angle =
+        util::bearing::angleBetweenBearings(entry_step_entry_bearing, exit_step_exit_bearing);
     // We allow for minor deviations from a straight line
     if (((entry_step.distance < MAX_COLLAPSE_DISTANCE && exit_step.intersections.size() == 1) ||
          (entry_angle <= 185 && exit_angle <= 185) || (entry_angle >= 175 && exit_angle >= 175)) &&
@@ -609,12 +583,12 @@ void collapseTurnAt(std::vector<RouteStep> &steps,
                     return step.intersections.front().bearings[step.intersections.front().out];
                 };
 
-                const auto first_angle =
-                    turn_angle(in_bearing(one_back_step), out_bearing(one_back_step));
-                const auto second_angle =
-                    turn_angle(in_bearing(current_step), out_bearing(current_step));
-                const auto bearing_turn_angle =
-                    turn_angle(in_bearing(one_back_step), out_bearing(current_step));
+                const auto first_angle = util::bearing::angleBetweenBearings(
+                    in_bearing(one_back_step), out_bearing(one_back_step));
+                const auto second_angle = util::bearing::angleBetweenBearings(
+                    in_bearing(current_step), out_bearing(current_step));
+                const auto bearing_turn_angle = util::bearing::angleBetweenBearings(
+                    in_bearing(one_back_step), out_bearing(current_step));
 
                 // When looking at an intersection, some angles, even though present, feel more like
                 // a straight turn. This happens most often at segregated intersections.
@@ -831,7 +805,7 @@ bool isStaggeredIntersection(const RouteStep &previous, const RouteStep &current
         const auto &intersection = step.intersections.front();
         const auto entry_bearing = intersection.bearings[intersection.in];
         const auto exit_bearing = intersection.bearings[intersection.out];
-        return turn_angle(entry_bearing, exit_bearing);
+        return util::bearing::angleBetweenBearings(entry_bearing, exit_bearing);
     };
 
     // Instead of using turn modifiers (e.g. as in isRightTurn) we want to be more strict here.
@@ -852,7 +826,6 @@ bool isStaggeredIntersection(const RouteStep &previous, const RouteStep &current
     // A RouteStep holds distance/duration from the maneuver to the subsequent step.
     // We are only interested in the distance between the first and the second.
     const auto is_short = previous.distance < MAX_STAGGERED_DISTANCE;
-
     return is_short && (left_right || right_left);
 }
 
@@ -958,6 +931,7 @@ std::vector<RouteStep> removeNoTurnInstructions(std::vector<RouteStep> steps)
 // that we come across.
 std::vector<RouteStep> postProcess(std::vector<RouteStep> steps)
 {
+    util::guidance::print(steps);
     // the steps should always include the first/last step in form of a location
     BOOST_ASSERT(steps.size() >= 2);
     if (steps.size() == 2)
@@ -1288,6 +1262,8 @@ std::vector<RouteStep> collapseTurns(std::vector<RouteStep> steps)
 // usually not be as relevant.
 void trimShortSegments(std::vector<RouteStep> &steps, LegGeometry &geometry)
 {
+    std::cout << "Segment Trimming\n";
+    util::guidance::print(steps);
     if (steps.size() < 2 || geometry.locations.size() <= 2)
         return;
 

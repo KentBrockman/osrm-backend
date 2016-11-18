@@ -2,6 +2,7 @@
 #include "extractor/guidance/constants.hpp"
 #include "extractor/guidance/toolkit.hpp"
 
+#include "util/bearing.hpp"
 #include "util/guidance/toolkit.hpp"
 
 #include <algorithm>
@@ -44,6 +45,61 @@ Intersection IntersectionGenerator::operator()(const NodeID from_node, const Edg
     return GetConnectedRoads(from_node, via_eid, USE_HIGH_PRECISION_MODE);
 }
 
+Intersection
+IntersectionGenerator::ComputeIntersectionShape(const NodeID node_at_center_of_intersection) const
+{
+    Intersection intersection;
+    // reserve enough items (+ the possibly missing u-turn edge)
+    intersection.reserve(node_based_graph.GetOutDegree(node_at_center_of_intersection));
+    const util::Coordinate turn_coordinate = node_info_list[node_at_center_of_intersection];
+
+    // number of lanes at the intersection changes how far we look down the road
+    const auto intersection_lanes =
+        getLaneCountAtIntersection(node_at_center_of_intersection, node_based_graph);
+
+    for (const EdgeID edge_connected_to_intersection :
+         node_based_graph.GetAdjacentEdgeRange(node_at_center_of_intersection))
+    {
+        BOOST_ASSERT(edge_connected_to_intersection != SPECIAL_EDGEID);
+        const NodeID to_node = node_based_graph.GetTarget(edge_connected_to_intersection);
+        double bearing = 0.;
+        // the default distance we lookahead on a road. This distance prevents small mapping
+        // errors to impact the turn angles.
+        const auto coordinate_along_edge_leaving =
+            coordinate_extractor.GetCoordinateAlongRoad(node_at_center_of_intersection,
+                                                        edge_connected_to_intersection,
+                                                        !INVERT,
+                                                        to_node,
+                                                        intersection_lanes);
+
+        bearing =
+            util::coordinate_calculation::bearing(turn_coordinate, coordinate_along_edge_leaving);
+
+        auto coords = coordinate_extractor.GetCoordinatesAlongRoad(
+            node_at_center_of_intersection, edge_connected_to_intersection, !INVERT, to_node);
+
+        intersection.push_back(
+            ConnectedRoad(TurnOperation{edge_connected_to_intersection,
+                                        0,
+                                        bearing,
+                                        {TurnType::Invalid, DirectionModifier::UTurn},
+                                        INVALID_LANE_DATAID},
+                          false));
+    }
+
+    if (!intersection.empty())
+    {
+        const auto base_bearing = util::bearing::reverseBearing(intersection.begin()->bearing);
+        std::sort(intersection.begin(),
+                  intersection.end(),
+                  [base_bearing](const ConnectedRoad &lhs, const ConnectedRoad &rhs) {
+                      return util::bearing::angleBetweenBearings(base_bearing, lhs.bearing) <
+                             util::bearing::angleBetweenBearings(base_bearing, rhs.bearing);
+                  });
+    }
+    return intersection;
+}
+
 //                                               a
 //                                               |
 //                                               |
@@ -61,6 +117,11 @@ Intersection IntersectionGenerator::GetConnectedRoads(const NodeID from_node,
                                                       const EdgeID via_eid,
                                                       const bool use_low_precision_angles) const
 {
+    BOOST_ASSERT([this](const NodeID from_node, const EdgeID via_eid) {
+        const auto range = node_based_graph.GetAdjacentEdgeRange(from_node);
+        return range.front() <= via_eid && via_eid <= range.back();
+    }(from_node, via_eid));
+
     Intersection intersection;
     const NodeID turn_node = node_based_graph.GetTarget(via_eid);
     // reserve enough items (+ the possibly missing u-turn edge)
@@ -156,6 +217,7 @@ Intersection IntersectionGenerator::GetConnectedRoads(const NodeID from_node,
                     turn_is_valid = number_of_emmiting_bidirectional_edges <= 1;
                 }
             }
+
             has_uturn_edge = true;
             out_segment_length = in_segment_length;
             BOOST_ASSERT(angle >= 0. && angle < std::numeric_limits<double>::epsilon());
@@ -193,8 +255,7 @@ Intersection IntersectionGenerator::GetConnectedRoads(const NodeID from_node,
     }
 
     // We hit the case of a street leading into nothing-ness. Since the code here assumes
-    // that this
-    // will never happen we add an artificial invalid uturn in this case.
+    // that this will never happen we add an artificial invalid uturn in this case.
     if (!has_uturn_edge)
     {
         const double bearing =

@@ -169,6 +169,7 @@ template <typename EdgeDataT, bool UseSharedMemory = false> class StaticGraph
         {
             const NodeID target = GetTarget(edge);
             const auto &data = GetEdgeData(edge);
+            std::cout << "Find: " << target << " " << data.id << std::endl;
             if (target == to && data.weight < smallest_weight &&
                 std::forward<FilterFunction>(filter)(data))
             {
