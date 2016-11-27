@@ -147,6 +147,7 @@ install:
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
       ./scripts/check_taginfo.py taginfo.json profiles/car.lua
     fi
+  - export VERBOSE=1
   - export OSRM_BUILD_DIR="$(pwd)/build-osrm"
   - mkdir ${OSRM_BUILD_DIR} && pushd ${OSRM_BUILD_DIR}
   - export CC=${CCOMPILER} CXX=${CXXCOMPILER}
