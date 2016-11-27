@@ -382,7 +382,7 @@ if(ENABLE_MASON)
   if(APPLE)
     set(LINKER_FLAGS "${TBB_LINKER_RPATHS} -Wl,-rpath -Wl,@executable_path")
   elseif(UNIX)
-    set(LINKER_FLAGS "${TBB_LINKER_RPATHS} -Wl,-rpath -Wl,\$ORIGIN -Wl,-z,origin")
+    set(LINKER_FLAGS "${TBB_LINKER_RPATHS} '-Wl,-rpath,$ORIGIN' -Wl,-z,origin")
   endif()
 
   set(OSRM_LIB_LINKER_FLAGS "${OSRM_LIB_LINKER_FLAGS} ${LINKER_FLAGS}")
