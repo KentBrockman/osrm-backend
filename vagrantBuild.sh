@@ -7,9 +7,9 @@ sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 20
 sudo update-alternatives --install /usr/bin/cpp cpp /usr/bin/cpp-6 20
 
 # Run install process as per https://github.com/Project-OSRM/osrm-backend/wiki/Building%20OSRM
-cd /vagrant
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build .
-sudo cmake --build . --target install
+# cd /vagrant
+# mkdir -p build
+# cd build
+# cmake .. -DCMAKE_BUILD_TYPE=Release
+# cmake --build .
+# sudo cmake --build . --target install
